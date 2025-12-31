@@ -2,8 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
+	"slices"
+	"strings"
 )
 
 func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
@@ -12,47 +13,38 @@ func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type resParams struct {
-		Error string `json:"error"`
-		Valid bool   `json:"valid"`
+		Error       string `json:"error"`
+		CleanedBody string `json:"cleaned_body"`
 	}
-
-	w.Header().Set("Content-Type", "application/json")
 
 	decoder := json.NewDecoder(r.Body)
 	params := reqParams{}
 
 	err := decoder.Decode(&params)
 	if err != nil {
-		log.Printf("Error decoding paramters: %s", err)
-		w.WriteHeader(500)
+		respondWithError(w, http.StatusInternalServerError, "Error decoding parameters", err)
 		return
 	}
 
-	if len(params.Body) > 140 {
-		response := resParams{
-			Error: "Chirp is too long",
-			Valid: false,
-		}
-		dat, err := json.Marshal(response)
-		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-		w.WriteHeader(400)
-		w.Write(dat)
+	const maxChripLength = 140
+	if len(params.Body) > maxChripLength {
+		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
 	} else {
-		response := resParams{
-			Valid: true,
+		// fix
+		bannedWords := []string{"kerfuffle", "sharbert", "fornax"}
+		cleaned := []string{}
+		bodySplit := strings.Split(params.Body, " ")
+		for _, word := range bodySplit {
+			if slices.Contains(bannedWords, strings.ToLower(word)) {
+				cleaned = append(cleaned, "****")
+			} else {
+				cleaned = append(cleaned, word)
+			}
 		}
-		dat, err := json.Marshal(response)
-		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-		w.WriteHeader(200)
-		w.Write(dat)
+		cleanedJoined := strings.Join(cleaned, " ")
+		respondWithJSON(w, http.StatusOK, resParams{
+			CleanedBody: cleanedJoined,
+		})
 	}
 
 }
