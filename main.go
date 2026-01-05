@@ -1,15 +1,19 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
 	"sync/atomic"
 
+	"github.com/antgngo/go-http-server/internal/database"
 	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	db             *database.Queries
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -26,6 +30,11 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		fmt.Printf("error")
+	}
 	serveMux := http.NewServeMux()
 	server := &http.Server{
 		Handler: serveMux,
@@ -33,6 +42,7 @@ func main() {
 	}
 
 	cfg := &apiConfig{}
+	cfg.db = database.New(db)
 
 	handler := http.FileServer(http.Dir("."))
 	serveMux.Handle("/app/", http.StripPrefix("/app", cfg.middlewareMetricsInc(handler)))
