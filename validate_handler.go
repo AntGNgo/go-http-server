@@ -5,19 +5,25 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
-func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
+func createChirp(w http.ResponseWriter, req *http.Request) {
 	type reqParams struct {
-		Body string `json:"body"`
+		Body   string    `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
 	}
-
 	type resParams struct {
-		Error       string `json:"error"`
-		CleanedBody string `json:"cleaned_body"`
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Body      string    `json:"body"`
+		UserID    uuid.UUID `json:"user_id"`
 	}
 
-	decoder := json.NewDecoder(r.Body)
+	decoder := json.NewDecoder(req.Body)
 	params := reqParams{}
 
 	err := decoder.Decode(&params)
@@ -26,14 +32,17 @@ func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func validateChirpHandler(msg string) {
 	const maxChripLength = 140
-	if len(params.Body) > maxChripLength {
+	if len(msg) > maxChripLength {
 		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
 	} else {
 		// fix
 		bannedWords := []string{"kerfuffle", "sharbert", "fornax"}
 		cleaned := []string{}
-		bodySplit := strings.Split(params.Body, " ")
+		bodySplit := strings.Split(msg, " ")
 		for _, word := range bodySplit {
 			if slices.Contains(bannedWords, strings.ToLower(word)) {
 				cleaned = append(cleaned, "****")
